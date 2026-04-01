@@ -1,5 +1,7 @@
 
 #include <Arduino.h>
+#include "servo.h"
+#include "generalConfig.h"
 
 /**
  * @brief Splits a command string into tokens based on spaces. Modifies the input command string by replacing spaces with null terminators and returns an array of pointers to the tokens. The number of tokens is returned via the tokenCount reference parameter.
@@ -11,17 +13,22 @@
 char** splitCommandIntoTokens(char* command, int& tokenCount) {
 	static char** tokens = new char*[5]; // Max 5 tokens for simplicity
 
+	Log.traceln("Splitting command into tokens: '%s'", command);
+
 	// Reset token count and start with the first token as the command type
+	int commandLength = strlen(command);
 	tokenCount = 0;
 	tokens[tokenCount++] = command; // First token is the command type
 
 	// Iterate through the command string and split into tokens based on spaces
-	for (size_t i = 0; i < strlen(command); i++) {
+	Log.verboseln("Starting tokenization loop, command length: %d", commandLength);
+	for (size_t i = 0; i < commandLength; i++) {
 		if (command[i] == ' ') {
 			command[i] = '\0'; // Null-terminate the token
 			tokens[tokenCount++] = command + i + 1; // Store pointer to next token
+			Log.verboseln("Found token: '%s'", tokens[tokenCount - 1]);
 			if (tokenCount >= 5) {
-				Serial.println("Error: Too many tokens in command. Max is 5.");	
+				Log.errorln("Error: Too many tokens in command. Max is 5.");	
 				break; // Prevent overflow
 			}
 		}
@@ -31,45 +38,63 @@ char** splitCommandIntoTokens(char* command, int& tokenCount) {
 		tokens[tokenCount] = nullptr; // Null-terminate the tokens array if less than max tokens found
 	}
 
+	Log.traceln("Completed tokenization, token count: %d", tokenCount);
 	return tokens;
 }
 
 void commandG0(char** params, int paramCount) {
-	Serial.println("[WARN] G0 Not implemented yet");
+	bool hasA = false, hasB = false;
+	int angleA = 0, angleB = 0;
+	
+	for (int i = 0; i < paramCount; i++) {
+		if (params[i][0] == 'A') {
+			angleA = atoi(params[i] + 1); // Convert the substring after 'A' to an integer
+			hasA = true;
+		} else if (params[i][0] == 'B') {
+			angleB = atoi(params[i] + 1); // Convert the substring after 'B' to an integer
+			hasB = true;
+		} else {
+			Log.errorln("Error: Unknown parameter '%s' in G0 command.", params[i]);
+			return;
+		}
+	}
+
+	if (hasA) moveServoA(angleA);
+	if (hasB) moveServoB(angleB);	
 }
 
 void commandG1(char** params, int paramCount) {
-	Serial.println("[WARN] G1 Not implemented yet");
+	Log.warningln("G1 Not implemented yet");
 }
 
 void commandG4(char** params, int paramCount) {
-	Serial.println("[WARN] G4 Not implemented yet");
+	Log.warningln("G4 Not implemented yet");
 }
 
 void commandG28(char** params, int paramCount) {
-	Serial.println("[WARN] G28 Not implemented yet");
+	Log.warningln("G28 Not implemented yet");
 }
 
 void commandM114(char** params, int paramCount) {
-	Serial.println("[WARN] M114 Not implemented yet");
+	Log.warningln("M114 Not implemented yet");
 }
 
 void parseCommand(char* command) {
 	if (strlen(command) == 0) return; // Ignore empty commands
+
+	Log.traceln("Parsing command: '%s'", command);
 
 	// Split the command into type and values using space as a delimiter
 	int tokenCount = 0;
 	char ** tokens = splitCommandIntoTokens(command, tokenCount);
 
 	if (tokenCount == 0) {
-		Serial.println("Error: No command type found.");
+		Log.errorln("Error: No command type found.");
 		return;
 	} else {
-		Serial.print("Command:");
+		Log.verboseln("Parsed command with %d tokens", tokenCount);
 		for (int i = 0; i < tokenCount; i++) {
-			Serial.print(" '");
-			Serial.print(tokens[i]);
-			Serial.print("'");
+			Log.verboseln("Token %d: '%s'", i, tokens[i]);
 		}
 	}
 	
@@ -84,8 +109,6 @@ void parseCommand(char* command) {
 	} else if (strcmp(tokens[0], "M114") == 0) {
 		commandM114(tokens + 1, tokenCount - 1);
 	} else {
-		Serial.print("Error: Unknown command type '");
-		Serial.print(tokens[0]);
-		Serial.println("'.");
+		Log.errorln("Error: Unknown command type '%s'.", tokens[0]);
 	}	
 }	
