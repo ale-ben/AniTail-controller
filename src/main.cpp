@@ -1,30 +1,43 @@
 #include <ESP32Servo.h>
-#include "serial.h"
 #include "parser.h"
 #include "servo.h"
 #include "generalConfig.h"
 
-Servo myservo;  // create servo object to control a servo
-// 16 servo objects can be created on the ESP32
+#ifdef ENABLE_SERIAL_CONTROL
+#include "serialControl.h"
+#endif
 
-int pos = 0;    // variable to store the servo position
-
-int servoPin = 21;
+#ifdef ENABLE_WIFI_CONTROL
+#include "wifiControl.h"
+#endif
 
 void setup() {
 	Serial.begin(115200);
 	Log.begin(LOG_LEVEL, &Serial);
+	Log.infoln("Starting AniTail...");
 	setupServo();
 	Log.infoln("Servo control ready!"); // Log message at notice level
+#ifdef ENABLE_WIFI_CONTROL
+	setupWiFiControl();
+	Log.infoln("WiFi control ready!"); // Log message at notice level
+#endif
+#ifdef ENABLE_SERIAL_CONTROL
+	Log.infoln("Serial control ready!"); // Log message at notice level
+#endif
 }
 
 char* getNextCommand() {
-	char* command = readSerialInput();
-	if (command != nullptr) return command;
+	char* command = nullptr;
 
-	//TODO: Implement other input methods (e.g. Bluetooth, WiFi) and check them here as well, returning the first available command from any source.
+#ifdef ENABLE_SERIAL_CONTROL
+	command = readSerialInput();
+#endif
 
-	return nullptr; // No command available yet
+#ifdef ENABLE_WIFI_CONTROL
+	if (command == nullptr) command = readWiFiInput();
+#endif
+
+	return command;
 }
 
 void loop() {
