@@ -4,15 +4,13 @@
 #include "generalConfig.h"
 
 /**
- * @brief Splits a command string into tokens based on spaces. Modifies the input command string by replacing spaces with null terminators and returns an array of pointers to the tokens. The number of tokens is returned via the tokenCount reference parameter.
+ * @brief Splits a command string into tokens based on spaces. Modifies the input command string by replacing spaces with null terminators and populates the provided tokens array.
  * 
  * @param command The input command string to be split. This string will be modified in-place.
+ * @param tokens Array of char pointers to store the tokens (must have space for at least 5 elements).
  * @param tokenCount Reference parameter that will be set to the number of tokens found in the command string.
- * @return char** An array of pointers to the tokens extracted from the command string. The first token (command type) will be at index 0, followed by any additional parameters. The caller is responsible for ensuring that the input command string remains valid while using the returned tokens.
  */
-char** splitCommandIntoTokens(char* command, int& tokenCount) {
-	static char** tokens = new char*[5]; // Max 5 tokens for simplicity
-
+void splitCommandIntoTokens(char* command, char** tokens, int& tokenCount) {
 	Log.traceln("Splitting command into tokens: '%s'", command);
 
 	// Reset token count and start with the first token as the command type
@@ -39,7 +37,6 @@ char** splitCommandIntoTokens(char* command, int& tokenCount) {
 	}
 
 	Log.traceln("Completed tokenization, token count: %d", tokenCount);
-	return tokens;
 }
 
 void commandG0(char** params, int paramCount) {
@@ -85,8 +82,9 @@ void parseCommand(char* command) {
 	Log.traceln("Parsing command: '%s'", command);
 
 	// Split the command into type and values using space as a delimiter
+	char* tokens[5]; // Local array to hold token pointers
 	int tokenCount = 0;
-	char ** tokens = splitCommandIntoTokens(command, tokenCount);
+	splitCommandIntoTokens(command, tokens, tokenCount);
 
 	if (tokenCount == 0) {
 		Log.errorln("Error: No command type found.");

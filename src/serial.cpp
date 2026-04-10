@@ -9,8 +9,8 @@ char* readSerialInput() {
 	while (Serial.available() > 0) {
 		char incomingByte = Serial.read();
 		
-		// Allocate or expand buffer as needed
-		if (bufferIndex >= bufferSize - 2 && (incomingByte != '\n' && incomingByte != '\r')) {
+		// Allocate or expand buffer as needed (always ensure room for at least 1 char + null terminator)
+		if (bufferIndex >= bufferSize - 1) {
 			Log.verboseln("Buffer full or near full (index: %d, size: %d), expanding buffer...", bufferIndex, bufferSize);
 			int newSize = (bufferSize == 0) ? 20 : bufferSize * 2;
 			char* newBuffer = (char*)realloc(inputBuffer, newSize);
