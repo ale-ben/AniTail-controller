@@ -4,7 +4,7 @@
 #include <WiFi.h>
 #ifdef ENABLE_WIFI_AP
 	// Access Point credentials
-	const char* ap_ssid = "AniTail-AP";
+	char ap_ssid[32];  // Will be set in setup with MAC address
 	const char* ap_password = "12345678";  // Minimum 8 characters for WPA2
 #else
 	// Station mode - use WiFiMulti for multiple network support
@@ -20,6 +20,11 @@ WiFiServer server(80);
 void setupWiFiControl() {
 #ifdef ENABLE_WIFI_AP
 	Log.traceln("Setting up WiFi Access Point...");
+	
+	// Generate unique SSID using last 6 digits of MAC address
+	uint8_t mac[6];
+	WiFi.macAddress(mac);
+	snprintf(ap_ssid, sizeof(ap_ssid), "AniTail-AP-%02X%02X%02X", mac[3], mac[4], mac[5]);
 	
 	// Disable WiFi persistence to avoid flash wear and potential issues
 	WiFi.persistent(false);
