@@ -21,13 +21,30 @@ void setupWiFiControl() {
 #ifdef ENABLE_WIFI_AP
 	Log.traceln("Setting up WiFi Access Point...");
 	
+	// Disable WiFi persistence to avoid flash wear and potential issues
+	WiFi.persistent(false);
+	
 	// Configure Access Point
 	WiFi.mode(WIFI_AP);
-	WiFi.softAP(ap_ssid, ap_password);
+	delay(100); // Brief delay after mode change
+	
+	// Disable power saving for more stable AP
+	WiFi.setSleep(false);
+	
+	// softAP(ssid, password, channel, hidden, max_connections)
+	// channel 1-13, hidden 0=broadcast, max_connections 1-4 (default 4)
+	bool success = WiFi.softAP(ap_ssid, ap_password, 6, 0, 4);
+	
+	if (!success) {
+		Log.errorln("Failed to start Access Point!");
+		return;
+	}
 	
 	IPAddress IP = WiFi.softAPIP();
 	Log.traceln("AP IP address: %p", IP);
 	Log.traceln("AP SSID: %s", ap_ssid);
+	Log.traceln("AP Password: %s", ap_password);
+	Log.traceln("Number of stations: %d", WiFi.softAPgetStationNum());
 #else
 	Log.traceln("Connecting to WiFi networks...");
 	
@@ -56,6 +73,22 @@ void setupWiFiControl() {
 	// Start server (same for both modes)
 	server.begin();
 	Log.traceln("HTTP server started on port 80");
+}
+
+void checkWiFiStatus() {
+#ifdef ENABLE_WIFI_AP
+	static unsigned long lastCheck = 0;
+	if (millis() - lastCheck > 5000) { // Check every 5 seconds
+		lastCheck = millis();
+		int numStations = WiFi.softAPgetStationNum();
+		Log.verboseln("AP Status - Stations: %d, Mode: %d", numStations, WiFi.getMode());
+		
+		// If WiFi mode changed unexpectedly, log it
+		if (WiFi.getMode() != WIFI_AP) {
+			Log.errorln("WiFi mode changed! Current mode: %d (should be %d)", WiFi.getMode(), WIFI_AP);
+		}
+	}
+#endif
 }
 
 char* readWiFiInput() {

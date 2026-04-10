@@ -41,6 +41,10 @@ char* getNextCommand() {
 }
 
 void loop() {
+#ifdef ENABLE_WIFI_CONTROL
+	checkWiFiStatus(); // Periodically log WiFi status
+#endif
+
 	// Get the next available command
 	char* command = getNextCommand();
 	if (command != nullptr) {
@@ -52,5 +56,5 @@ void loop() {
 		free(command); // Free the memory allocated for the command
 	}
 
-	delay(100); // Small delay to avoid overwhelming the loop
+	delay(10); // Small delay to keep watchdog happy
 }
