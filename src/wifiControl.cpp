@@ -1,0 +1,191 @@
+#include "wifiControl.h"
+
+#ifdef ENABLE_WIFI_CONTROL
+#include <WiFi.h>
+
+// Access Point credentials
+const char* ap_ssid = "AniTail-AP";
+const char* ap_password = "12345678";  // Minimum 8 characters for WPA2
+
+WiFiServer server(80);
+
+void setupWiFiControl() {
+	Log.traceln("Setting up WiFi Access Point...");
+	
+	// Configure Access Point
+	WiFi.mode(WIFI_AP);
+	WiFi.softAP(ap_ssid, ap_password);
+	
+	IPAddress IP = WiFi.softAPIP();
+	Log.traceln("AP IP address: %p", IP);
+	Log.traceln("AP SSID: %s", ap_ssid);
+	
+	// Start server
+	server.begin();
+	Log.traceln("HTTP server started on port 80");
+}
+
+char* readWiFiInput() {
+	static WiFiClient activeClient;
+	static int bufferIndex = 0;
+	static int bufferSize = 0;
+	static char* inputBuffer = nullptr;
+	static int currentLineLength = 0;
+	static unsigned long clientTimeout = 0;
+	
+	// Check for new client if we don't have an active one
+	if (!activeClient || !activeClient.connected()) {
+		activeClient = server.available();
+		if (activeClient) {
+			Log.traceln("New client connected");
+			// Reset buffer for new connection
+			if (inputBuffer) {
+				free(inputBuffer);
+				inputBuffer = nullptr;
+			}
+			bufferIndex = 0;
+			bufferSize = 0;
+			currentLineLength = 0;
+			clientTimeout = millis() + 3000; // 3 second timeout
+		}
+	}
+	
+	// Process active client if available
+	if (activeClient && activeClient.connected()) {
+		// Check for timeout
+		if (millis() > clientTimeout) {
+			Log.traceln("Client timeout");
+			activeClient.stop();
+			if (inputBuffer) {
+				free(inputBuffer);
+				inputBuffer = nullptr;
+			}
+			bufferIndex = 0;
+			bufferSize = 0;
+			currentLineLength = 0;
+			return nullptr;
+		}
+		
+		// Read all available data (similar to serial pattern)
+		while (activeClient.available()) {
+			char incomingByte = activeClient.read();
+			
+			// Allocate or expand buffer as needed
+			if (bufferIndex >= bufferSize - 1) {
+				Log.verboseln("Buffer full or near full (index: %d, size: %d), expanding buffer...", bufferIndex, bufferSize);
+				int newSize = (bufferSize == 0) ? 128 : bufferSize * 2;
+				char* newBuffer = (char*)realloc(inputBuffer, newSize);
+				if (newBuffer == nullptr) {
+					Log.errorln("Error: Memory allocation failed.");
+					free(inputBuffer);
+					inputBuffer = nullptr;
+					bufferIndex = 0;
+					bufferSize = 0;
+					currentLineLength = 0;
+					activeClient.stop();
+					return nullptr;
+				}
+				inputBuffer = newBuffer;
+				bufferSize = newSize;
+			}
+			
+			// Add character to buffer
+			inputBuffer[bufferIndex++] = incomingByte;
+			
+			if (incomingByte == '\n') {
+				// If the current line is blank, we've received the end of the HTTP request
+				if (currentLineLength == 0) {
+					// Null terminate the buffer
+					inputBuffer[bufferIndex] = '\0';
+					
+					// Parse the HTTP request
+					char* method = nullptr;
+					char* endpoint = nullptr;
+					char* bodyStart = nullptr;
+					
+					// Find first space (end of method)
+					char* firstSpace = strchr(inputBuffer, ' ');
+					if (firstSpace) {
+						method = inputBuffer;
+						*firstSpace = '\0';
+						
+						// Find second space (end of endpoint)
+						char* secondSpace = strchr(firstSpace + 1, ' ');
+						if (secondSpace) {
+							endpoint = firstSpace + 1;
+							*secondSpace = '\0';
+						}
+					}
+					
+					// Find body (after \r\n\r\n)
+					bodyStart = strstr(inputBuffer, "\r\n\r\n");
+					if (bodyStart) {
+						bodyStart += 4; // Skip past \r\n\r\n
+					}
+					
+					Log.traceln("Request: %s %s", method ? method : "?", endpoint ? endpoint : "?");
+					
+					// Send HTTP response
+					activeClient.println("HTTP/1.1 200 OK");
+					activeClient.println("Content-Type: application/json");
+					activeClient.println("Access-Control-Allow-Origin: *");
+					activeClient.println("Connection: close");
+					activeClient.println();
+					
+					char* result = nullptr;
+					
+					// Handle REST endpoints
+					if (method && endpoint && strcmp(method, "GET") == 0 && 
+					    (strcmp(endpoint, "/") == 0 || strcmp(endpoint, "/status") == 0)) {
+						activeClient.println("{\"status\":\"ok\",\"device\":\"AniTail\"}");
+					}
+					else if (method && endpoint && strcmp(method, "POST") == 0 && strcmp(endpoint, "/tcode") == 0) {
+						if (bodyStart && *bodyStart != '\0') {
+							Log.traceln("TCODE command: %s", bodyStart);
+							
+							// Allocate new buffer for result and copy body
+							size_t bodyLen = strlen(bodyStart);
+							result = (char*)malloc(bodyLen + 1);
+							if (result) {
+								strcpy(result, bodyStart);
+								// Trim trailing whitespace
+								while (bodyLen > 0 && (result[bodyLen-1] == ' ' || result[bodyLen-1] == '\r' || result[bodyLen-1] == '\n')) {
+									result[--bodyLen] = '\0';
+								}
+								Log.verboseln("Complete command received: '%s'", result);
+							}
+							
+							activeClient.println("{\"status\":\"ok\",\"command\":\"tcode\"}");
+						} else {
+							activeClient.println("{\"error\":\"Empty body\"}");
+						}
+					}
+					else {
+						activeClient.println("{\"error\":\"Unknown endpoint or method\"}");
+					}
+					
+					// Close the connection
+					activeClient.stop();
+					Log.traceln("Client disconnected");
+					
+					// Clean up input buffer
+					free(inputBuffer);
+					inputBuffer = nullptr;
+					bufferIndex = 0;
+					bufferSize = 0;
+					currentLineLength = 0;
+					
+					return result; // Caller must free()
+				} else {
+					currentLineLength = 0;
+				}
+			} else if (incomingByte != '\r') {
+				currentLineLength++;
+			}
+		}
+	}
+	
+	return nullptr; // No complete command yet
+}
+
+#endif // ENABLE_WIFI_CONTROL
