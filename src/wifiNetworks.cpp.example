@@ -1,0 +1,14 @@
+#include "wifiNetworks.h"
+
+
+#ifdef ENABLE_WIFI_CONTROL
+#ifndef ENABLE_WIFI_AP
+void configureClientNetworks(WiFiMulti& wifiMulti) {
+	// Add multiple networks (priority: first to last)
+	wifiMulti.addAP("SSID1", "PW1");
+	wifiMulti.addAP("SSID2", "PW2");
+	wifiMulti.addAP("SSID3", "PW3");
+	// Add more networks as needed
+}
+#endif // ENABLE_WIFI_AP
+#endif // ENABLE_WIFI_CONTROL

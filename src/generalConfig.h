@@ -8,6 +8,6 @@
 
 #define ENABLE_SERIAL_CONTROL
 #define ENABLE_WIFI_CONTROL
-#define ENABLE_WIFI_AP // Requires ENABLE_WIFI_CONTROL to be defined
+//#define ENABLE_WIFI_AP // Requires ENABLE_WIFI_CONTROL to be defined
 
 #endif // GENERAL_CONFIG_H
