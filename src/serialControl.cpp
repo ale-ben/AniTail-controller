@@ -1,5 +1,7 @@
-#include "Arduino.h"
-#include "generalConfig.h"
+#include "serialControl.h"
+
+#ifdef ENABLE_SERIAL_CONTROL
+#include <Arduino.h>
 
 char* readSerialInput() {
 	static int bufferIndex = 0;
@@ -47,3 +49,4 @@ char* readSerialInput() {
 	
 	return nullptr; // No complete command yet
 }
+#endif // ENABLE_SERIAL_CONTROL
