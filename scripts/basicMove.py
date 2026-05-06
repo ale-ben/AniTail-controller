@@ -13,7 +13,7 @@ import sys
 IP_ADDRESS = "192.168.1.51"  # Default ESP32 AP mode IP
 PORT = 80
 ENDPOINT = "/tcode"
-INTERVAL_SECONDS = 1  # Send request every N seconds
+INTERVAL_SECONDS = 2  # Send request every N seconds
 
 
 def send_command(ip, port, endpoint, body):
@@ -47,9 +47,9 @@ def main():
         while True:
             count += 1
             print(f"[{count}] ", end="")
-            send_command(IP_ADDRESS, PORT, ENDPOINT, "G0 A0 B180")
+            send_command(IP_ADDRESS, PORT, ENDPOINT, f"G1 A0 B0 T{INTERVAL_SECONDS * 1000}")
             time.sleep(INTERVAL_SECONDS)
-            send_command(IP_ADDRESS, PORT, ENDPOINT, "G0 A180 B0")
+            send_command(IP_ADDRESS, PORT, ENDPOINT, f"G1 A180 B180 T{INTERVAL_SECONDS * 1000}")
             time.sleep(INTERVAL_SECONDS)
     except KeyboardInterrupt:
         print(f"\n\nStopped after {count} requests")

@@ -4,6 +4,39 @@
 #include "generalConfig.h"
 
 /**
+ * @brief Linearly interpolates between two angles over a specified duration.
+ * 
+ * @param startAngle The starting angle
+ * @param endAngle The target angle
+ * @param durationMs Total interpolation duration in milliseconds
+ */
+void interpolateServoSmooth(int startAngleA, int endAngleA, int startAngleB, int endAngleB, unsigned long durationMs) {
+	Log.traceln("Interpolating servos smoothly over %lu ms", durationMs);
+	unsigned long startTime = millis();
+	unsigned long elapsed = 0;
+	
+	while (elapsed < durationMs) {
+		elapsed = millis() - startTime;
+		float progress = (float)elapsed / durationMs;
+		if (progress > 1.0) progress = 1.0;
+		
+		// Linear interpolation for both servos
+		int currentA = startAngleA + (endAngleA - startAngleA) * progress;
+		int currentB = startAngleB + (endAngleB - startAngleB) * progress;
+		
+		moveServoA(currentA);
+		moveServoB(currentB);
+		
+		delay(10); // 10ms update interval for smooth motion
+	}
+	
+	// Ensure final position is exact
+	moveServoA(endAngleA);
+	moveServoB(endAngleB);
+	Log.traceln("Interpolation complete. Final positions: A=%d, B=%d", endAngleA, endAngleB);
+}
+
+/**
  * @brief Splits a command string into tokens based on spaces. Modifies the input command string by replacing spaces with null terminators and populates the provided tokens array.
  * 
  * @param command The input command string to be split. This string will be modified in-place.
@@ -61,19 +94,86 @@ void commandG0(char** params, int paramCount) {
 }
 
 void commandG1(char** params, int paramCount) {
-	Log.warningln("G1 Not implemented yet");
+	bool hasA = false, hasB = false, hasT = false;
+	int angleA = getCurrentAngleA(), angleB = getCurrentAngleB();
+	unsigned long durationMs = 1000; // Default 1 second
+	
+	for (int i = 0; i < paramCount; i++) {
+		if (params[i][0] == 'A') {
+			angleA = atoi(params[i] + 1);
+			hasA = true;
+		} else if (params[i][0] == 'B') {
+			angleB = atoi(params[i] + 1);
+			hasB = true;
+		} else if (params[i][0] == 'T') {
+			durationMs = atoi(params[i] + 1);
+			hasT = true;
+		} else {
+			Log.errorln("Error: Unknown parameter '%s' in G1 command.", params[i]);
+			return;
+		}
+	}
+
+	if (!hasA && !hasB) {
+		Log.warningln("G1 command requires at least A or B parameter.");
+		return;
+	}
+
+	int currentA = getCurrentAngleA();
+	int currentB = getCurrentAngleB();
+	Log.traceln("G1 command: moving from A=%d,B=%d to A=%d,B=%d over %lu ms", 
+		currentA, currentB, angleA, angleB, durationMs);
+	
+	interpolateServoSmooth(currentA, angleA, currentB, angleB, durationMs);
 }
 
 void commandG4(char** params, int paramCount) {
-	Log.warningln("G4 Not implemented yet");
+	if (paramCount == 0) {
+		Log.warningln("G4 requires a delay parameter (P/T in ms, or S in seconds).");
+		return;
+	}
+
+	unsigned long delayMs = 0;
+	bool hasDelay = false;
+
+	for (int i = 0; i < paramCount; i++) {
+		if (params[i][1] == '\0') {
+			Log.errorln("Error: Missing value for G4 parameter '%s'.", params[i]);
+			return;
+		}
+
+		if (params[i][0] == 'P' || params[i][0] == 'T') {
+			delayMs = strtoul(params[i] + 1, nullptr, 10);
+			hasDelay = true;
+		} else if (params[i][0] == 'S') {
+			delayMs = strtoul(params[i] + 1, nullptr, 10) * 1000UL;
+			hasDelay = true;
+		} else {
+			Log.errorln("Error: Unknown parameter '%s' in G4 command.", params[i]);
+			return;
+		}
+	}
+
+	if (!hasDelay) {
+		Log.warningln("G4 did not receive a valid delay value.");
+		return;
+	}
+
+	Log.traceln("Executing G4 dwell for %lu ms", delayMs);
+	delay(delayMs);
 }
 
 void commandG28(char** params, int paramCount) {
-	Log.warningln("G28 Not implemented yet");
+	Log.traceln("Executing G28 command to home all servos.");
+	moveServoA(SERVO_A_HOME_ANGLE);
+	moveServoB(SERVO_B_HOME_ANGLE);
 }
 
 void commandM114(char** params, int paramCount) {
-	Log.warningln("M114 Not implemented yet");
+	Log.traceln("Executing M114 command to get current angles.");
+	int angleA = getCurrentAngleA();
+	int angleB = getCurrentAngleB();
+	Log.traceln("Current angles: A=%d, B=%d", angleA, angleB);
 }
 
 void parseCommand(char* command) {

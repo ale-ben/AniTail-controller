@@ -8,7 +8,7 @@
 #define SERVO_A_PERIOD_HZ 50
 #define SERVO_A_MIN_ANGLE 0
 #define SERVO_A_MAX_ANGLE 180
-#define SERVO_A_HOME_ANGLE 90
+#define SERVO_A_HOME_ANGLE 0
 
 // B servo config
 #define SERVO_B_PIN 3
@@ -17,10 +17,12 @@
 #define SERVO_B_PERIOD_HZ 50
 #define SERVO_B_MIN_ANGLE 0
 #define SERVO_B_MAX_ANGLE 180
-#define SERVO_B_HOME_ANGLE 90
+#define SERVO_B_HOME_ANGLE 180
 
 void setupServo();
 void moveServoA(int angle);
 void moveServoB(int angle);
+int getCurrentAngleA();
+int getCurrentAngleB();
 
 #endif // SERVO_H

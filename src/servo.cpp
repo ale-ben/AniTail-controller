@@ -39,3 +39,11 @@ void moveServoB(int angle) {
 	Log.traceln("Moving Servo B to angle: %d", angle);
 	servoB.write(angle);
 }
+
+int getCurrentAngleA() {
+	return servoA.read();
+}
+
+int getCurrentAngleB() {
+	return servoB.read();
+}
