@@ -14,6 +14,17 @@
 SdExFat sd;
 ExFile autostartFile;
 
+static char* duplicateCommandBuffer(const char* source, size_t length) {
+	char* result = static_cast<char*>(malloc(length + 1));
+	if (result == nullptr) {
+		return nullptr;
+	}
+
+	memcpy(result, source, length);
+	result[length] = '\0';
+	return result;
+}
+
 int autostartIsPresent = 0; // Global variable to track if autostart.tcode is present on SD card
 
 int setupSDCard() {
@@ -103,8 +114,11 @@ static char* readSDCardInputInternal(bool canRewind) {
 		int nextByte = autostartFile.read();
 		if (nextByte < 0) {
 			if (bufferIndex > 0) {
-				lineBuffer[bufferIndex] = '\0';
-				return lineBuffer;
+				char* result = duplicateCommandBuffer(lineBuffer, bufferIndex);
+				if (result == nullptr) {
+					Log.errorln("Error: SD input result allocation failed.");
+				}
+				return result;
 			}
 
 			if (!canRewind) {
@@ -124,8 +138,12 @@ static char* readSDCardInputInternal(bool canRewind) {
 			if (bufferIndex == 0) {
 				continue;
 			}
-			lineBuffer[bufferIndex] = '\0';
-			return lineBuffer;
+			char* result = duplicateCommandBuffer(lineBuffer, bufferIndex);
+			if (result == nullptr) {
+				Log.errorln("Error: SD input result allocation failed.");
+				return nullptr;
+			}
+			return result;
 		}
 
 		if (bufferIndex >= bufferSize - 1) {
