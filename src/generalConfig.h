@@ -9,5 +9,6 @@
 #define ENABLE_SERIAL_CONTROL
 #define ENABLE_WIFI_CONTROL
 //#define ENABLE_WIFI_AP // Requires ENABLE_WIFI_CONTROL to be defined
+#define ENABLE_SDCARD_CONTROL
 
 #endif // GENERAL_CONFIG_H

@@ -2,7 +2,7 @@
 #define SERVO_H
 
 // A servo config
-#define SERVO_A_PIN 2
+#define SERVO_A_PIN 0
 #define SERVO_A_MIN_PULSE 500
 #define SERVO_A_MAX_PULSE 2500
 #define SERVO_A_PERIOD_HZ 50
@@ -11,7 +11,7 @@
 #define SERVO_A_HOME_ANGLE 0
 
 // B servo config
-#define SERVO_B_PIN 3
+#define SERVO_B_PIN 1
 #define SERVO_B_MIN_PULSE 500
 #define SERVO_B_MAX_PULSE 2500
 #define SERVO_B_PERIOD_HZ 50

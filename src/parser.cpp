@@ -5,7 +5,7 @@
 
 /**
  * @brief Linearly interpolates between two angles over a specified duration.
- * 
+ *
  * @param startAngle The starting angle
  * @param endAngle The target angle
  * @param durationMs Total interpolation duration in milliseconds
@@ -14,22 +14,22 @@ void interpolateServoSmooth(int startAngleA, int endAngleA, int startAngleB, int
 	Log.traceln("Interpolating servos smoothly over %lu ms", durationMs);
 	unsigned long startTime = millis();
 	unsigned long elapsed = 0;
-	
+
 	while (elapsed < durationMs) {
 		elapsed = millis() - startTime;
 		float progress = (float)elapsed / durationMs;
 		if (progress > 1.0) progress = 1.0;
-		
+
 		// Linear interpolation for both servos
 		int currentA = startAngleA + (endAngleA - startAngleA) * progress;
 		int currentB = startAngleB + (endAngleB - startAngleB) * progress;
-		
+
 		moveServoA(currentA);
 		moveServoB(currentB);
-		
+
 		delay(10); // 10ms update interval for smooth motion
 	}
-	
+
 	// Ensure final position is exact
 	moveServoA(endAngleA);
 	moveServoB(endAngleB);
@@ -38,7 +38,7 @@ void interpolateServoSmooth(int startAngleA, int endAngleA, int startAngleB, int
 
 /**
  * @brief Splits a command string into tokens based on spaces. Modifies the input command string by replacing spaces with null terminators and populates the provided tokens array.
- * 
+ *
  * @param command The input command string to be split. This string will be modified in-place.
  * @param tokens Array of char pointers to store the tokens (must have space for at least 5 elements).
  * @param tokenCount Reference parameter that will be set to the number of tokens found in the command string.
@@ -59,7 +59,7 @@ void splitCommandIntoTokens(char* command, char** tokens, int& tokenCount) {
 			tokens[tokenCount++] = command + i + 1; // Store pointer to next token
 			Log.verboseln("Found token: '%s'", tokens[tokenCount - 1]);
 			if (tokenCount >= 5) {
-				Log.errorln("Error: Too many tokens in command. Max is 5.");	
+				Log.errorln("Error: Too many tokens in command. Max is 5.");
 				break; // Prevent overflow
 			}
 		}
@@ -75,7 +75,7 @@ void splitCommandIntoTokens(char* command, char** tokens, int& tokenCount) {
 void commandG0(char** params, int paramCount) {
 	bool hasA = false, hasB = false;
 	int angleA = 0, angleB = 0;
-	
+
 	for (int i = 0; i < paramCount; i++) {
 		if (params[i][0] == 'A') {
 			angleA = atoi(params[i] + 1); // Convert the substring after 'A' to an integer
@@ -90,14 +90,14 @@ void commandG0(char** params, int paramCount) {
 	}
 
 	if (hasA) moveServoA(angleA);
-	if (hasB) moveServoB(angleB);	
+	if (hasB) moveServoB(angleB);
 }
 
 void commandG1(char** params, int paramCount) {
 	bool hasA = false, hasB = false, hasT = false;
 	int angleA = getCurrentAngleA(), angleB = getCurrentAngleB();
 	unsigned long durationMs = 1000; // Default 1 second
-	
+
 	for (int i = 0; i < paramCount; i++) {
 		if (params[i][0] == 'A') {
 			angleA = atoi(params[i] + 1);
@@ -121,9 +121,9 @@ void commandG1(char** params, int paramCount) {
 
 	int currentA = getCurrentAngleA();
 	int currentB = getCurrentAngleB();
-	Log.traceln("G1 command: moving from A=%d,B=%d to A=%d,B=%d over %lu ms", 
-		currentA, currentB, angleA, angleB, durationMs);
-	
+	Log.traceln("G1 command: moving from A=%d,B=%d to A=%d,B=%d over %lu ms",
+	            currentA, currentB, angleA, angleB, durationMs);
+
 	interpolateServoSmooth(currentA, angleA, currentB, angleB, durationMs);
 }
 
@@ -195,7 +195,7 @@ void parseCommand(char* command) {
 			Log.verboseln("Token %d: '%s'", i, tokens[i]);
 		}
 	}
-	
+
 	if (strcmp(tokens[0], "G0") == 0) {
 		commandG0(tokens + 1, tokenCount - 1);
 	} else if (strcmp(tokens[0], "G1") == 0 ) {
@@ -208,5 +208,5 @@ void parseCommand(char* command) {
 		commandM114(tokens + 1, tokenCount - 1);
 	} else {
 		Log.errorln("Error: Unknown command type '%s'.", tokens[0]);
-	}	
-}	
+	}
+}

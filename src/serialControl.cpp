@@ -7,10 +7,10 @@ char* readSerialInput() {
 	static int bufferIndex = 0;
 	static int bufferSize = 0;
 	static char* inputBuffer = nullptr;
-	
+
 	while (Serial.available() > 0) {
 		char incomingByte = Serial.read();
-		
+
 		// Allocate or expand buffer as needed (always ensure room for at least 1 char + null terminator)
 		if (bufferIndex >= bufferSize - 1) {
 			Log.verboseln("Buffer full or near full (index: %d, size: %d), expanding buffer...", bufferIndex, bufferSize);
@@ -27,11 +27,11 @@ char* readSerialInput() {
 			inputBuffer = newBuffer;
 			bufferSize = newSize;
 		}
-		
+
 		if (incomingByte == '\n' || incomingByte == '\r') {
 			// Complete command - null terminate and return
 			inputBuffer[bufferIndex] = '\0';
-			
+
 			// Transfer ownership to caller
 			char* result = inputBuffer;
 			inputBuffer = nullptr;
@@ -39,14 +39,14 @@ char* readSerialInput() {
 			bufferSize = 0;
 
 			Log.verboseln("Complete command received: '%s'", result);
-			
+
 			return result; // Caller must free()
 		}
-		
+
 		// Add character to buffer
 		inputBuffer[bufferIndex++] = incomingByte;
 	}
-	
+
 	return nullptr; // No complete command yet
 }
 #endif // ENABLE_SERIAL_CONTROL

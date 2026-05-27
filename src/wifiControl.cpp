@@ -3,13 +3,13 @@
 #ifdef ENABLE_WIFI_CONTROL
 #include <WiFi.h>
 #ifdef ENABLE_WIFI_AP
-	// Access Point credentials
-	char ap_ssid[32];  // Will be set in setup with MAC address
-	const char* ap_password = "12345678";  // Minimum 8 characters for WPA2
+// Access Point credentials
+char ap_ssid[32];          // Will be set in setup with MAC address
+const char* ap_password = "12345678";          // Minimum 8 characters for WPA2
 #else
-	// Station mode - use WiFiMulti for multiple network support
+// Station mode - use WiFiMulti for multiple network support
 	#include <WiFiMulti.h>
-	WiFiMulti wifiMulti;
+WiFiMulti wifiMulti;
 
 
 	#include "wifiNetworks.h"
@@ -20,31 +20,31 @@ WiFiServer server(80);
 void setupWiFiControl() {
 #ifdef ENABLE_WIFI_AP
 	Log.traceln("Setting up WiFi Access Point...");
-	
+
 	// Generate unique SSID using last 6 digits of MAC address
 	uint8_t mac[6];
 	WiFi.macAddress(mac);
 	snprintf(ap_ssid, sizeof(ap_ssid), "AniTail-AP-%02X%02X%02X", mac[3], mac[4], mac[5]);
-	
+
 	// Disable WiFi persistence to avoid flash wear and potential issues
 	WiFi.persistent(false);
-	
+
 	// Configure Access Point
 	WiFi.mode(WIFI_AP);
 	delay(100); // Brief delay after mode change
-	
+
 	// Disable power saving for more stable AP
 	WiFi.setSleep(false);
-	
+
 	// softAP(ssid, password, channel, hidden, max_connections)
 	// channel 1-13, hidden 0=broadcast, max_connections 1-4 (default 4)
 	bool success = WiFi.softAP(ap_ssid, ap_password, 6, 0, 4);
-	
+
 	if (!success) {
 		Log.errorln("Failed to start Access Point!");
 		return;
 	}
-	
+
 	IPAddress IP = WiFi.softAPIP();
 	Log.traceln("AP IP address: %p", IP);
 	Log.traceln("AP SSID: %s", ap_ssid);
@@ -52,19 +52,19 @@ void setupWiFiControl() {
 	Log.traceln("Number of stations: %d", WiFi.softAPgetStationNum());
 #else
 	Log.traceln("Connecting to WiFi networks...");
-	
+
 	// Configure Station mode
 	WiFi.mode(WIFI_STA);
-	
+
 	// Configure client networks
 	configureClientNetworks(wifiMulti);
-	
+
 	// Try to connect (with timeout)
 	unsigned long startAttempt = millis();
 	while (wifiMulti.run() != WL_CONNECTED && millis() - startAttempt < 10000) {
 		delay(100);
 	}
-	
+
 	if (WiFi.status() == WL_CONNECTED) {
 		IPAddress IP = WiFi.localIP();
 		Log.traceln("Connected! IP address: %p", IP);
@@ -74,7 +74,7 @@ void setupWiFiControl() {
 		return;
 	}
 #endif
-	
+
 	// Start server (same for both modes)
 	server.begin();
 	Log.traceln("HTTP server started on port 80");
@@ -87,7 +87,7 @@ void checkWiFiStatus() {
 		lastCheck = millis();
 		int numStations = WiFi.softAPgetStationNum();
 		Log.verboseln("AP Status - Stations: %d, Mode: %d", numStations, WiFi.getMode());
-		
+
 		// If WiFi mode changed unexpectedly, log it
 		if (WiFi.getMode() != WIFI_AP) {
 			Log.errorln("WiFi mode changed! Current mode: %d (should be %d)", WiFi.getMode(), WIFI_AP);
@@ -106,7 +106,7 @@ char* readWiFiInput() {
 	static int contentLength = 0;
 	static bool headersComplete = false;
 	static int bodyBytesRead = 0;
-	
+
 	// Check for new client if we don't have an active one
 	if (!activeClient || !activeClient.connected()) {
 		activeClient = server.available();
@@ -126,7 +126,7 @@ char* readWiFiInput() {
 			clientTimeout = millis() + 3000; // 3 second timeout
 		}
 	}
-	
+
 	// Process active client if available
 	if (activeClient && activeClient.connected()) {
 		// Check for timeout
@@ -145,11 +145,11 @@ char* readWiFiInput() {
 			bodyBytesRead = 0;
 			return nullptr;
 		}
-		
+
 		// Read all available data (similar to serial pattern)
 		while (activeClient.available()) {
 			char incomingByte = activeClient.read();
-			
+
 			// Allocate or expand buffer as needed
 			if (bufferIndex >= bufferSize - 1) {
 				Log.verboseln("Buffer full or near full (index: %d, size: %d), expanding buffer...", bufferIndex, bufferSize);
@@ -171,10 +171,10 @@ char* readWiFiInput() {
 				inputBuffer = newBuffer;
 				bufferSize = newSize;
 			}
-			
+
 			// Add character to buffer
 			inputBuffer[bufferIndex++] = incomingByte;
-			
+
 			if (!headersComplete) {
 				// Still reading headers
 				if (incomingByte == '\n') {
@@ -182,7 +182,7 @@ char* readWiFiInput() {
 						// Blank line - headers complete
 						headersComplete = true;
 						bodyBytesRead = 0;
-						
+
 						// Parse Content-Length from headers if present
 						inputBuffer[bufferIndex] = '\0';
 						char* clHeader = strstr(inputBuffer, "Content-Length: ");
@@ -204,17 +204,17 @@ char* readWiFiInput() {
 				bodyBytesRead++;
 			}
 		}
-		
+
 		// Check if we have a complete request
 		// For GET requests: headers complete and no content
 		// For POST requests: headers complete and all body bytes received
 		if (headersComplete && (contentLength == 0 || bodyBytesRead >= contentLength)) {
 			// Null terminate the buffer
 			inputBuffer[bufferIndex] = '\0';
-			
-			Log.verboseln("Complete request received. Buffer length: %d, Content-Length: %d, Body bytes: %d", 
+
+			Log.verboseln("Complete request received. Buffer length: %d, Content-Length: %d, Body bytes: %d",
 			              bufferIndex, contentLength, bodyBytesRead);
-			
+
 			// Find body (after \r\n\r\n) BEFORE modifying buffer
 			char* bodyStart = strstr(inputBuffer, "\r\n\r\n");
 			if (bodyStart) {
@@ -223,17 +223,17 @@ char* readWiFiInput() {
 			} else {
 				Log.verboseln("Body delimiter \\r\\n\\r\\n not found!");
 			}
-			
+
 			// Parse the HTTP request
 			char* method = nullptr;
 			char* endpoint = nullptr;
-			
+
 			// Find first space (end of method)
 			char* firstSpace = strchr(inputBuffer, ' ');
 			if (firstSpace) {
 				method = inputBuffer;
 				*firstSpace = '\0';
-				
+
 				// Find second space (end of endpoint)
 				char* secondSpace = strchr(firstSpace + 1, ' ');
 				if (secondSpace) {
@@ -241,27 +241,27 @@ char* readWiFiInput() {
 					*secondSpace = '\0';
 				}
 			}
-			
+
 			Log.traceln("Request: %s %s", method ? method : "?", endpoint ? endpoint : "?");
-			
+
 			// Send HTTP response
 			activeClient.println("HTTP/1.1 200 OK");
 			activeClient.println("Content-Type: application/json");
 			activeClient.println("Access-Control-Allow-Origin: *");
 			activeClient.println("Connection: close");
 			activeClient.println();
-			
+
 			char* result = nullptr;
-			
+
 			// Handle REST endpoints
-			if (method && endpoint && strcmp(method, "GET") == 0 && 
+			if (method && endpoint && strcmp(method, "GET") == 0 &&
 			    (strcmp(endpoint, "/") == 0 || strcmp(endpoint, "/status") == 0)) {
 				activeClient.println("{\"status\":\"ok\",\"device\":\"AniTail\"}");
 			}
 			else if (method && endpoint && strcmp(method, "POST") == 0 && strcmp(endpoint, "/tcode") == 0) {
 				if (bodyStart && *bodyStart != '\0') {
 					Log.traceln("TCODE command: %s", bodyStart);
-					
+
 					// Allocate new buffer for result and copy body
 					size_t bodyLen = strlen(bodyStart);
 					result = (char*)malloc(bodyLen + 1);
@@ -273,7 +273,7 @@ char* readWiFiInput() {
 						}
 						Log.verboseln("Complete command received: '%s'", result);
 					}
-					
+
 					activeClient.println("{\"status\":\"ok\",\"command\":\"tcode\"}");
 				} else {
 					activeClient.println("{\"error\":\"Empty body\"}");
@@ -282,11 +282,11 @@ char* readWiFiInput() {
 			else {
 				activeClient.println("{\"error\":\"Unknown endpoint or method\"}");
 			}
-			
+
 			// Close the connection
 			activeClient.stop();
 			Log.traceln("Client disconnected");
-			
+
 			// Clean up input buffer
 			free(inputBuffer);
 			inputBuffer = nullptr;
@@ -296,11 +296,11 @@ char* readWiFiInput() {
 			contentLength = 0;
 			headersComplete = false;
 			bodyBytesRead = 0;
-			
+
 			return result; // Caller must free()
 		}
 	}
-	
+
 	return nullptr; // No complete command yet
 }
 
