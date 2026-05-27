@@ -4,11 +4,15 @@
 
 Servo servoA;
 Servo servoB;
+int currentAngleA = SERVO_A_HOME_ANGLE;
+int currentAngleB = SERVO_B_HOME_ANGLE;
 
 void setupServo() {
 	// Setup for servo A
 	servoA.setPeriodHertz(SERVO_A_PERIOD_HZ);    // standard 50 hz servo
 	servoA.attach(SERVO_A_PIN, SERVO_A_MIN_PULSE, SERVO_A_MAX_PULSE);
+	servoA.write(SERVO_A_HOME_ANGLE);
+	currentAngleA = SERVO_A_HOME_ANGLE;
 	Log.traceln("Servo A initialized on pin: %d with home position at %d degrees", SERVO_A_PIN, SERVO_A_HOME_ANGLE);
 	Log.verboseln("Servo A min angle: %d degrees, max angle: %d degrees", SERVO_A_MIN_ANGLE, SERVO_A_MAX_ANGLE);
 	Log.verboseln("Servo A min pulse: %d us, max pulse: %d us, period: %d Hz", SERVO_A_MIN_PULSE, SERVO_A_MAX_PULSE, SERVO_A_PERIOD_HZ);
@@ -17,6 +21,8 @@ void setupServo() {
 	// Setup for servo B
 	servoB.setPeriodHertz(SERVO_B_PERIOD_HZ);    // standard 50 hz servo
 	servoB.attach(SERVO_B_PIN, SERVO_B_MIN_PULSE, SERVO_B_MAX_PULSE);
+	servoB.write(SERVO_B_HOME_ANGLE);
+	currentAngleB = SERVO_B_HOME_ANGLE;
 	Log.traceln("Servo B initialized on pin: %d with home position at %d degrees", SERVO_B_PIN, SERVO_B_HOME_ANGLE);
 	Log.verboseln("Servo B min angle: %d degrees, max angle: %d degrees", SERVO_B_MIN_ANGLE, SERVO_B_MAX_ANGLE);
 	Log.verboseln("Servo B min pulse: %d us, max pulse: %d us, period: %d Hz", SERVO_B_MIN_PULSE, SERVO_B_MAX_PULSE, SERVO_B_PERIOD_HZ);
@@ -29,6 +35,7 @@ void moveServoA(int angle) {
 	}
 	Log.traceln("Moving Servo A to angle: %d", angle);
 	servoA.write(angle);
+	currentAngleA = angle;
 }
 
 void moveServoB(int angle) {
@@ -38,12 +45,13 @@ void moveServoB(int angle) {
 	}
 	Log.traceln("Moving Servo B to angle: %d", angle);
 	servoB.write(angle);
+	currentAngleB = angle;
 }
 
 int getCurrentAngleA() {
-	return servoA.read();
+	return currentAngleA;
 }
 
 int getCurrentAngleB() {
-	return servoB.read();
+	return currentAngleB;
 }

@@ -21,7 +21,6 @@ void setup() {
 	Log.begin(LOG_LEVEL, &Serial);
 	Log.infoln("Starting AniTail...");
 	setupServo();
-	parseCommand("G28"); // Home all servos to home position on startup
 	Log.infoln("Servo control ready!"); // Log message at notice level
 #ifdef ENABLE_WIFI_CONTROL
 	setupWiFiControl();
