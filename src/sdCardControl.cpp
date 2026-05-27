@@ -14,6 +14,8 @@
 SdExFat sd;
 ExFile autostartFile;
 
+int autostartIsPresent = 0; // Global variable to track if autostart.tcode is present on SD card
+
 int setupSDCard() {
 	Log.traceln("SD Card SPI pins: MISO=%d, MOSI=%d, SCK=%d, SS=%d", MISO, MOSI, SCK, SS);
 
@@ -63,13 +65,17 @@ int setupSDCard() {
 	// Check if autostart.tcode exists and is a file
 	if (!sd.vol()->exists("autostart.tcode")) {
 		Log.warningln("autostart.tcode not found on SD card.");
+		autostartIsPresent = 0;
 	} else {
 		if (!autostartFile.open(sd.vol(), "autostart.tcode", O_RDONLY)) {
 			Log.warningln("Failed to open autostart.tcode");
+			return -1;
 		} else if (autostartFile.isDirectory()) {
 			Log.warningln("autostart.tcode is a directory, expected a file.");
 			autostartFile.close();
+			return -1;
 		} else {
+			autostartIsPresent = 1;
 			Log.infoln("autostart.tcode found and opened successfully.");
 		}
 	}
@@ -141,6 +147,9 @@ static char* readSDCardInputInternal(bool canRewind) {
 }
 
 char* readSDCardInput() {
+	if (autostartIsPresent == 0) {
+		return nullptr; // autostart.tcode is not present, so no input to read
+	}
 	return readSDCardInputInternal(true);
 };
 #endif // ENABLE_SDCARD_CONTROL
