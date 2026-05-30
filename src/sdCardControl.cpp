@@ -109,10 +109,15 @@ static char* readSDCardInputInternal(bool canRewind) {
 	static int bufferSize = 0;
 	static char* lineBuffer = nullptr;
 	int bufferIndex = 0;
+	bool skipCommentLine = false;
 
 	while (true) {
 		int nextByte = autostartFile.read();
 		if (nextByte < 0) {
+			if (skipCommentLine) {
+				skipCommentLine = false;
+				bufferIndex = 0;
+			}
 			if (bufferIndex > 0) {
 				char* result = duplicateCommandBuffer(lineBuffer, bufferIndex);
 				if (result == nullptr) {
@@ -135,6 +140,11 @@ static char* readSDCardInputInternal(bool canRewind) {
 
 		char incomingByte = static_cast<char>(nextByte);
 		if (incomingByte == '\n' || incomingByte == '\r') {
+			if (skipCommentLine) {
+				skipCommentLine = false;
+				bufferIndex = 0;
+				continue;
+			}
 			if (bufferIndex == 0) {
 				continue;
 			}
@@ -144,6 +154,15 @@ static char* readSDCardInputInternal(bool canRewind) {
 				return nullptr;
 			}
 			return result;
+		}
+
+		if (bufferIndex == 0 && incomingByte == '#') {
+			skipCommentLine = true;
+			continue;
+		}
+
+		if (skipCommentLine) {
+			continue;
 		}
 
 		if (bufferIndex >= bufferSize - 1) {
