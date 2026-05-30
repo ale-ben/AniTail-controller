@@ -13,6 +13,9 @@
 //------------------------------------------------------------------------------
 SdExFat sd;
 ExFile autostartFile;
+ExFile sdCommandFile;
+bool sdCommandFileActive = false;
+bool sdPlaybackPaused = false;
 
 static char* duplicateCommandBuffer(const char* source, size_t length) {
 	char* result = static_cast<char*>(malloc(length + 1));
@@ -23,6 +26,142 @@ static char* duplicateCommandBuffer(const char* source, size_t length) {
 	memcpy(result, source, length);
 	result[length] = '\0';
 	return result;
+}
+
+static bool hasTCodeExtension(const char* path) {
+	const char* lastDot = strrchr(path, '.');
+	if (lastDot == nullptr) {
+		return false;
+	}
+
+	return strcmp(lastDot, ".tcode") == 0;
+}
+
+static bool commandTailIsOnlyWhitespace(const char* command, size_t length, size_t startIndex) {
+	for (size_t i = startIndex; i < length; i++) {
+		if (command[i] != ' ') {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void restartActiveSDInputFile() {
+	ExFile* activeInputFile = sdCommandFileActive ? &sdCommandFile : &autostartFile;
+
+	if (!activeInputFile->isOpen()) {
+		Log.errorln("S1 failed: no active SD input file is open.");
+		return;
+	}
+
+	if (!activeInputFile->seekSet(0)) {
+		Log.errorln("S1 failed: could not rewind active SD input file.");
+		return;
+	}
+
+	if (sdCommandFileActive) {
+		Log.infoln("S1: restarted current S0 file from beginning.");
+	} else {
+		Log.infoln("S1: restarted autostart.tcode from beginning.");
+	}
+}
+
+bool setActiveSDCommandFile(const char* filename) {
+	if (filename == nullptr || filename[0] == '\0') {
+		Log.warningln("S0 command requires a filename.");
+		return false;
+	}
+
+	size_t rawFilenameLength = strlen(filename);
+	bool appendExtension = true;
+	if (rawFilenameLength < 250) {
+		char rawFilename[250];
+		memcpy(rawFilename, filename, rawFilenameLength);
+		rawFilename[rawFilenameLength] = '\0';
+		appendExtension = !hasTCodeExtension(rawFilename);
+	}
+
+	size_t fullPathLength = rawFilenameLength + (appendExtension ? 6 : 0);
+	char* filePath = static_cast<char*>(malloc(fullPathLength + 1));
+	if (filePath == nullptr) {
+		Log.errorln("Failed to allocate memory for S0 file path.");
+		return false;
+	}
+
+	memcpy(filePath, filename, rawFilenameLength);
+	if (appendExtension) {
+		memcpy(filePath + rawFilenameLength, ".tcode", 6);
+	} else {
+		filePath[rawFilenameLength] = '\0';
+	}
+
+	if (sdCommandFile.isOpen()) {
+		sdCommandFile.close();
+	}
+	sdCommandFileActive = false;
+
+	if (!sdCommandFile.open(sd.vol(), filePath, O_RDONLY)) {
+		Log.errorln("S0 file not found or failed to open: %s", filePath);
+		free(filePath);
+		return false;
+	}
+
+	if (sdCommandFile.isDirectory()) {
+		Log.errorln("S0 path is a directory, expected file: %s", filePath);
+		sdCommandFile.close();
+		free(filePath);
+		return false;
+	}
+
+	sdCommandFileActive = true;
+	sdPlaybackPaused = false;
+	Log.infoln("S0 command opened file: %s", filePath);
+	free(filePath);
+	return true;
+}
+
+void pauseSDCardPlayback() {
+	if (!sdCommandFileActive && autostartIsPresent == 0) {
+		Log.warningln("S2 failed: no SD input file is available.");
+		return;
+	}
+
+	if (sdPlaybackPaused) {
+		Log.infoln("S2: SD playback is already paused.");
+		return;
+	}
+
+	sdPlaybackPaused = true;
+	Log.infoln("S2: paused SD playback.");
+}
+
+void resumeSDCardPlayback() {
+	if (!sdCommandFileActive && !autostartFile.isOpen() && autostartIsPresent == 0) {
+		Log.warningln("S3 failed: no SD input file is available.");
+		return;
+	}
+
+	if (!sdPlaybackPaused) {
+		Log.infoln("S3: SD playback is already running.");
+		return;
+	}
+
+	sdPlaybackPaused = false;
+	Log.infoln("S3: resumed SD playback.");
+}
+
+static bool parseSDCardCommand(const char* command, size_t length) {
+	if (length < 2) {
+		Log.warningln("Invalid SD command: '%.*s'", static_cast<int>(length), command);
+		return true;
+	}
+
+	if (command[1] == '1' && commandTailIsOnlyWhitespace(command, length, 2)) {
+		restartActiveSDInputFile();
+		return true;
+	}
+
+	return false;
 }
 
 int autostartIsPresent = 0; // Global variable to track if autostart.tcode is present on SD card
@@ -94,12 +233,20 @@ int setupSDCard() {
 }
 
 /**
- * @brief If curr line pointer is null, read the first line of autostart.tcode, otherwise read the next line. Return null if no more lines to read.
+ * @brief Read the next command line from SD input sources.
  *
  * @return char* Pointer to the line read, or null if no more lines are available.
  */
-static char* readSDCardInputInternal(bool canRewind) {
-	if (!autostartFile.isOpen()) {
+char* readSDCardInput() {
+	if (sdPlaybackPaused) {
+		return nullptr;
+	}
+
+	if (autostartIsPresent == 0 && !sdCommandFileActive) {
+		return nullptr; // autostart.tcode is not present, so no input to read
+	}
+
+	if (!sdCommandFileActive && !autostartFile.isOpen()) {
 		if (!autostartFile.open(sd.vol(), "autostart.tcode", O_RDONLY)) {
 			Log.errorln("Failed to open autostart.tcode");
 			return nullptr;
@@ -112,13 +259,20 @@ static char* readSDCardInputInternal(bool canRewind) {
 	bool skipCommentLine = false;
 
 	while (true) {
-		int nextByte = autostartFile.read();
+		ExFile* activeInputFile = sdCommandFileActive ? &sdCommandFile : &autostartFile;
+		int nextByte = activeInputFile->read();
 		if (nextByte < 0) {
 			if (skipCommentLine) {
 				skipCommentLine = false;
 				bufferIndex = 0;
 			}
 			if (bufferIndex > 0) {
+				if (lineBuffer[0] == 'S') {
+					if (parseSDCardCommand(lineBuffer, static_cast<size_t>(bufferIndex))) {
+						bufferIndex = 0;
+						continue;
+					}
+				}
 				char* result = duplicateCommandBuffer(lineBuffer, bufferIndex);
 				if (result == nullptr) {
 					Log.errorln("Error: SD input result allocation failed.");
@@ -126,16 +280,26 @@ static char* readSDCardInputInternal(bool canRewind) {
 				return result;
 			}
 
-			if (!canRewind) {
-				return nullptr; // File is empty or unreadable.
-			}
+			if (sdCommandFileActive) {
+				sdCommandFile.close();
+				sdCommandFileActive = false;
 
-			autostartFile.close();
-			if (!autostartFile.open(sd.vol(), "autostart.tcode", O_RDONLY)) {
-				Log.errorln("Failed to reopen autostart.tcode");
-				return nullptr;
+				if (autostartIsPresent == 0) {
+					Log.infoln("S0 file complete. No autostart.tcode available.");
+					return nullptr;
+				}
+
+				if (!autostartFile.isOpen()) {
+					if (!autostartFile.open(sd.vol(), "autostart.tcode", O_RDONLY)) {
+						Log.errorln("Failed to reopen autostart.tcode after S0 completion.");
+						return nullptr;
+					}
+				}
+
+				Log.infoln("S0 file complete. Resuming autostart.tcode.");
+				continue;
 			}
-			return readSDCardInputInternal(false);
+			return nullptr; // File complete or unreadable.
 		}
 
 		char incomingByte = static_cast<char>(nextByte);
@@ -147,6 +311,12 @@ static char* readSDCardInputInternal(bool canRewind) {
 			}
 			if (bufferIndex == 0) {
 				continue;
+			}
+			if (lineBuffer[0] == 'S') {
+				if (parseSDCardCommand(lineBuffer, static_cast<size_t>(bufferIndex))) {
+					bufferIndex = 0;
+					continue;
+				}
 			}
 			char* result = duplicateCommandBuffer(lineBuffer, bufferIndex);
 			if (result == nullptr) {
@@ -183,10 +353,4 @@ static char* readSDCardInputInternal(bool canRewind) {
 	}
 }
 
-char* readSDCardInput() {
-	if (autostartIsPresent == 0) {
-		return nullptr; // autostart.tcode is not present, so no input to read
-	}
-	return readSDCardInputInternal(true);
-};
 #endif // ENABLE_SDCARD_CONTROL

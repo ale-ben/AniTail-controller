@@ -7,6 +7,9 @@
 #define CHIP_SELECT 7
 int setupSDCard();
 
+bool setActiveSDCommandFile(const char* filename);
+void pauseSDCardPlayback();
+void resumeSDCardPlayback();
 char* readSDCardInput();
 
 #endif // ENABLE_SDCARD_CONTROL
