@@ -19,3 +19,21 @@ Moves all motors to their home position (hardcoded in cfg).
 
 ### M114 (get current angles)
 Returns the current angles of all motors in the format "A{angle} B{angle} ...". For example, "A90 B45" would indicate that the first motor is at 90 degrees and the second motor is at 45 degrees.
+
+
+
+## File management commands
+
+### S0 {filename}
+This command executes a TCODE file stored on the SD card. For example, "S0 test/dance" would execute the commands in the "dance.tcode" file.
+#### As of now, AniTail only support one open file (on top of autostart)
+
+### S1
+Restarts the currently running TCODE file from the beginning. This can be useful for looping animations or resetting the tail position.
+#### NOTE: This command is only available in tcode files. Sending it from the serial console will have no effect.
+
+### S2
+Pauses the currently running TCODE file. The tail will hold its current position until the file is resumed or a new command is issued.
+
+### S3
+Resumes a paused TCODE file from where it was paused. This allows for seamless continuation of animations or movements after a pause.

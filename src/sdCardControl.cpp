@@ -16,6 +16,7 @@ ExFile autostartFile;
 ExFile sdCommandFile;
 bool sdCommandFileActive = false;
 bool sdPlaybackPaused = false;
+int autostartIsPresent = 0; // Global variable to track if autostart.tcode is present on SD card
 
 static char* duplicateCommandBuffer(const char* source, size_t length) {
 	char* result = static_cast<char*>(malloc(length + 1));
@@ -91,6 +92,7 @@ bool setActiveSDCommandFile(const char* filename) {
 	memcpy(filePath, filename, rawFilenameLength);
 	if (appendExtension) {
 		memcpy(filePath + rawFilenameLength, ".tcode", 6);
+		filePath[fullPathLength] = '\0';
 	} else {
 		filePath[rawFilenameLength] = '\0';
 	}
@@ -163,8 +165,6 @@ static bool parseSDCardCommand(const char* command, size_t length) {
 
 	return false;
 }
-
-int autostartIsPresent = 0; // Global variable to track if autostart.tcode is present on SD card
 
 int setupSDCard() {
 	Log.traceln("SD Card SPI pins: MISO=%d, MOSI=%d, SCK=%d, SS=%d", MISO, MOSI, SCK, SS);
