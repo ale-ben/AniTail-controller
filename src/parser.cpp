@@ -3,6 +3,10 @@
 #include "servo.h"
 #include "generalConfig.h"
 
+#ifdef ENABLE_SDCARD_CONTROL
+#include "sdCardControl.h"
+#endif
+
 /**
  * @brief Linearly interpolates between two angles over a specified duration.
  *
@@ -176,10 +180,86 @@ void commandM114(char** params, int paramCount) {
 	Log.traceln("Current angles: A=%d, B=%d", angleA, angleB);
 }
 
+static bool commandTailIsOnlyWhitespace(const char* command, size_t startIndex) {
+	for (size_t i = startIndex; command[i] != '\0'; i++) {
+		if (command[i] != ' ') {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void commandS0(char* command) {
+	char* filename = command + 2;
+	while (*filename == ' ') {
+		filename++;
+	}
+
+	if (*filename == '\0') {
+		Log.warningln("S0 command requires a filename.");
+		return;
+	}
+
+	char* filenameEnd = filename + strlen(filename);
+	while (filenameEnd > filename && filenameEnd[-1] == ' ') {
+		filenameEnd--;
+	}
+	*filenameEnd = '\0';
+
+	if (*filename == '\0') {
+		Log.warningln("S0 command requires a filename.");
+		return;
+	}
+
+#ifdef ENABLE_SDCARD_CONTROL
+	setActiveSDCommandFile(filename);
+#else
+	Log.warningln("S0 command ignored: SD card control is disabled.");
+#endif
+}
+
+static void commandS2() {
+#ifdef ENABLE_SDCARD_CONTROL
+	pauseSDCardPlayback();
+#else
+	Log.warningln("S2 command ignored: SD card control is disabled.");
+#endif
+}
+
+static void commandS3() {
+#ifdef ENABLE_SDCARD_CONTROL
+	resumeSDCardPlayback();
+#else
+	Log.warningln("S3 command ignored: SD card control is disabled.");
+#endif
+}
+
 void parseCommand(char* command) {
 	if (strlen(command) == 0) return; // Ignore empty commands
 
 	Log.traceln("Parsing command: '%s'", command);
+
+	if (command[0] == 'S' && command[1] != '\0') {
+		if (command[1] == '0') {
+			commandS0(command);
+			return;
+		}
+
+		if (command[1] == '1' && commandTailIsOnlyWhitespace(command, 2)) {
+			Log.warningln("S1 command is only available inside SD TCODE files.");
+			return;
+		}
+
+		if (command[1] == '2' && commandTailIsOnlyWhitespace(command, 2)) {
+			commandS2();
+			return;
+		}
+
+		if (command[1] == '3' && commandTailIsOnlyWhitespace(command, 2)) {
+			commandS3();
+			return;
+		}
+	}
 
 	// Split the command into type and values using space as a delimiter
 	char* tokens[5]; // Local array to hold token pointers
