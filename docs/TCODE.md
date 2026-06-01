@@ -34,6 +34,6 @@ Restarts the currently running TCODE file from the beginning. This can be useful
 
 ### S2
 Pauses the currently running TCODE file. The tail will hold its current position until the file is resumed or a new command is issued.
-
+ 
 ### S3
 Resumes a paused TCODE file from where it was paused. This allows for seamless continuation of animations or movements after a pause.
